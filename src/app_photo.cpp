@@ -24,30 +24,7 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap){
 
 // PNG Dekoder Değişkenleri ve Fonksiyonları
 static PNG png;
-static File pngFile;
 
-void * pngOpen(const char *filename, int32_t *size) {
-  Serial.printf("PNG Aciliyor: %s\n", filename);
-  pngFile = SD.open(filename, "r");
-  if (!pngFile) {
-    Serial.println("PNG Dosya acilamadi!");
-    return NULL;
-  }
-  *size = pngFile.size();
-  return &pngFile;
-}
-void pngClose(void *handle) {
-  if (pngFile) pngFile.close();
-}
-int32_t pngRead(PNGFILE *handle, uint8_t *buffer, int32_t length) {
-  if (!pngFile) return 0;
-  return pngFile.read(buffer, length);
-}
-int32_t pngSeek(PNGFILE *handle, int32_t position) {
-  if (!pngFile) return 0;
-  if (pngFile.seek(position)) return position;
-  return -1;
-}
 int pngDraw(PNGDRAW *pDraw) {
   if (pSpr) {
     uint16_t usPixels[pDraw->iWidth];
@@ -121,65 +98,100 @@ void updatePhotoApp(TFT_eSprite* spr, ControlResult& res, bool& appLoaded, bool&
             }
             else if (path.endsWith(".jpg") || path.endsWith(".jpeg") || path.endsWith(".JPG") || path.endsWith(".JPEG")) {
                 // Resmi çiz (drawFsJpg kullanarak SD nesnesini açıkça belirtiyoruz)
-                Serial.println("JPG Cizimi Baslatiliyor...");
+                Serial.println("JPG Yukleniyor...");
                 
-                // 1. Boyutları al
-                uint16_t w = 0, h = 0;
-                uint16_t result = 0;
-                if (TJpgDec.getJpgSize(&w, &h, path.c_str()) == 0) {
+                // Dosyayı belleğe oku (SD uyumluluğu için en garanti yöntem)
+                File jpgFile = SD.open(path);
+                if (jpgFile) {
+                    size_t jpgSize = jpgFile.size();
+                    uint8_t *jpgBuf = (uint8_t*)malloc(jpgSize);
+                    if (jpgBuf) {
+                        jpgFile.read(jpgBuf, jpgSize);
+                        jpgFile.close();
+                        
+                        uint16_t w = 0, h = 0;
+                        if (TJpgDec.getJpgSize(&w, &h, jpgBuf, jpgSize) == 0) {
 
-                    // 2. Ölçekleme Faktörünü Hesapla (1, 2, 4, 8)
-                    uint8_t scale = 1;
-                    if (w > 0 && h > 0) {
-                        // Ekran: 240x290 (Alt bar hariç)
-                        if (w > 240 || h > 290) scale = 2;
-                        if (w > 480 || h > 580) scale = 4;
-                        if (w > 960 || h > 1160) scale = 8;
+                            // 2. Ölçekleme Faktörünü Hesapla (1, 2, 4, 8)
+                            uint8_t scale = 1;
+                            if (w > 0 && h > 0) {
+                                // Ekran: 240x290 (Alt bar hariç)
+                                if (w > 240 || h > 290) scale = 2;
+                                if (w > 480 || h > 580) scale = 4;
+                                if (w > 960 || h > 1160) scale = 8;
+                            }
+                            TJpgDec.setJpgScale(scale);
+
+                            // 3. Ortalama Pozisyonunu Hesapla
+                            int16_t scaled_w = w / scale;
+                            int16_t scaled_h = h / scale;
+                            int16_t x_pos = (240 - scaled_w) / 2;
+                            int16_t y_pos = (290 - scaled_h) / 2;
+                            
+                            if (x_pos < 0) x_pos = 0;
+                            if (y_pos < 0) y_pos = 0;
+
+                            Serial.printf("Cizim Konumu: X=%d Y=%d (Boyut: %dx%d)\n", x_pos, y_pos, scaled_w, scaled_h);
+
+                            TJpgDec.drawJpg(x_pos, y_pos, jpgBuf, jpgSize);
+                        } else {
+                            Serial.println("JPG Boyutu Okunamadi!");
+                            spr->setTextColor(TFT_RED, TFT_BLACK);
+                            spr->drawCentreString("JPG Hata", 120, 160, 2);
+                        }
+                        free(jpgBuf);
+                    } else {
+                        Serial.println("Bellek Yetersiz!");
+                        jpgFile.close();
+                        spr->setTextColor(TFT_RED, TFT_BLACK);
+                        spr->drawCentreString("Bellek Dolu", 120, 160, 2);
                     }
-                    TJpgDec.setJpgScale(scale);
-
-                    // 3. Ortalama Pozisyonunu Hesapla
-                    int16_t scaled_w = w / scale;
-                    int16_t scaled_h = h / scale;
-                    int16_t x_pos = (240 - scaled_w) / 2;
-                    int16_t y_pos = (290 - scaled_h) / 2;
-                    
-                    if (x_pos < 0) x_pos = 0;
-                    if (y_pos < 0) y_pos = 0;
-
-                    Serial.printf("Cizim Konumu: X=%d Y=%d (Boyut: %dx%d)\n", x_pos, y_pos, scaled_w, scaled_h);
-
-                    result = TJpgDec.drawFsJpg(x_pos, y_pos, path.c_str(), SD);
-                    Serial.printf("JPG Sonuc: %d\n", result);
                 } else {
-                    Serial.println("JPG Boyutu Okunamadi!");
-                }
-                
-                if (result == 0) {
+                    Serial.println("Dosya Acilamadi!");
                     spr->setTextColor(TFT_RED, TFT_BLACK);
-                    spr->drawCentreString("JPG Decode Error!", 120, 160, 2);
+                    spr->drawCentreString("Dosya Hatasi", 120, 160, 2);
                 }
             } else if (path.endsWith(".png") || path.endsWith(".PNG")) {
                 Serial.println("PNG Cizimi Baslatiliyor...");
-                int16_t rc = png.open(path.c_str(), pngOpen, pngClose, pngRead, pngSeek, pngDraw);
-                if (rc == PNG_SUCCESS) {
-                    // PNG Ortalama
-                    int32_t w = png.getWidth();
-                    int32_t h = png.getHeight();
-                    png_x_offset = (240 - w) / 2;
-                    png_y_offset = (290 - h) / 2;
-                    if (png_x_offset < 0) png_x_offset = 0;
-                    if (png_y_offset < 0) png_y_offset = 0;
+                
+                // Dosyayı belleğe oku (SD uyumluluğu için en garanti yöntem)
+                File pngFile = SD.open(path);
+                if (pngFile) {
+                    size_t pngSize = pngFile.size();
+                    uint8_t *pngBuf = (uint8_t*)malloc(pngSize);
+                    if (pngBuf) {
+                        pngFile.read(pngBuf, pngSize);
+                        pngFile.close();
+                        
+                        int16_t rc = png.openRAM(pngBuf, pngSize, pngDraw);
+                        if (rc == PNG_SUCCESS) {
+                            // PNG Ortalama
+                            int32_t w = png.getWidth();
+                            int32_t h = png.getHeight();
+                            png_x_offset = (240 - w) / 2;
+                            png_y_offset = (290 - h) / 2;
+                            if (png_x_offset < 0) png_x_offset = 0;
+                            if (png_y_offset < 0) png_y_offset = 0;
 
-                    int ret = png.decode(NULL, 0);
-                    png.close();
-                    // Serial.printf("PNG Decode Sonuc: %d\n", ret);
+                            png.decode(NULL, 0);
+                            png.close();
+                        } else {
+                            spr->setTextColor(TFT_RED, TFT_BLACK);
+                            spr->drawCentreString("PNG Decode Error!", 120, 160, 2);
+                            String err = "Err: " + String(rc);
+                            spr->drawCentreString(err, 120, 180, 2);
+                        }
+                        free(pngBuf);
+                    } else {
+                        Serial.println("Bellek Yetersiz!");
+                        pngFile.close();
+                        spr->setTextColor(TFT_RED, TFT_BLACK);
+                        spr->drawCentreString("Bellek Dolu", 120, 160, 2);
+                    }
                 } else {
-                    // Serial.printf("PNG Acilamadi. Hata kodu: %d\n", rc);
+                    Serial.println("Dosya Acilamadi!");
                     spr->setTextColor(TFT_RED, TFT_BLACK);
-                    spr->drawCentreString("PNG Decode Error!", 120, 160, 2);
-                    String err = "Err: " + String(rc);
-                    spr->drawCentreString(err, 120, 180, 2);
+                    spr->drawCentreString("Dosya Hatasi", 120, 160, 2);
                 }
             } else {
                 spr->fillSprite(TFT_BLACK);
