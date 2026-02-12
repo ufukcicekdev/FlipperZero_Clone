@@ -90,7 +90,17 @@ void drawAppScreen(TFT_eSprite* spr, String title, uint16_t color, String msg, b
     spr->drawCentreString(title, 120, 15, 4);
 
     if (msg != "") {
-        spr->drawCentreString(msg, 120, 120, 2);
+        // Çok satırlı mesaj desteği (Satır satır bölüp ortalayarak yaz)
+        int y = 110; // Başlangıç Y konumu
+        int start = 0;
+        int end = msg.indexOf('\n');
+        while (end != -1) {
+            spr->drawCentreString(msg.substring(start, end), 120, y, 2);
+            y += 20; // Satır aralığı
+            start = end + 1;
+            end = msg.indexOf('\n', start);
+        }
+        spr->drawCentreString(msg.substring(start), 120, y, 2);
     }
 
     // Standart Çıkış Butonu

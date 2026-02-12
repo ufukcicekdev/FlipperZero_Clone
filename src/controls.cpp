@@ -4,6 +4,7 @@
 static int sX, sY, lastX, lastY;
 static int startX, startY;
 static bool isDown = false;
+static unsigned long touchStartTime = 0; // Gürültü filtresi için zamanlayıcı
 
 // Trackball önceki durumları (Kenar algılama için)
 static int lastTbState = 0; // Bitmask: 0:Up, 1:Down, 2:Left, 3:Right, 4:Btn
@@ -20,8 +21,8 @@ void Controls::init() {
 ControlResult Controls::update(TFT_eSPI* tft) {
     ControlResult res = {false, false, false, 0, 0, 0, 0, false, false, false, false, false};
     uint16_t tx, ty;
-    // Hassasiyet eşiğini düşürdük (100 -> 50) algılamayı iyileştirmek için
-    bool touched = tft->getTouch(&tx, &ty, 50);
+    // Hassasiyet eşiğini artırdık (Gürültü/Hayalet dokunuşları önlemek için 250 yaptık)
+    bool touched = tft->getTouch(&tx, &ty, 250);
 
     if (touched) {
         // DOKUNMATİK DÜZELTMESİ (Swap & Scale):
