@@ -25,6 +25,8 @@ void updateNFCApp(TFT_eSprite* spr, ControlResult& res, bool& appLoaded, bool& n
     if (!appLoaded) {
         // I2C Başlat
         Wire.begin(NFC_SDA, NFC_SCL);
+        Wire.setClock(100000); // I2C hızını 100kHz'e düşür (Hataları azaltır)
+        Wire.setTimeOut(1000); // I2C Timeout süresini artır (263 hatası için)
         nfc.begin();
         
         uint32_t versiondata = nfc.getFirmwareVersion();
@@ -372,22 +374,27 @@ void updateNFCApp(TFT_eSprite* spr, ControlResult& res, bool& appLoaded, bool& n
             return;
         }
 
-        // Animasyonlu Ekran
-        spr->fillSprite(TFT_BLACK);
-        drawAppScreen(spr, "EMULASYON", 0x001F, "", false);
-        
-        // Mavi Radar Animasyonu
-        animRadius = (animRadius + 4) % 80;
-        spr->drawCircle(120, 150, animRadius, 0x001F);
-        spr->drawCircle(120, 150, (animRadius + 25) % 80, 0x0010);
-        spr->drawCircle(120, 150, (animRadius + 50) % 80, 0x000F);
-        
-        spr->setTextColor(TFT_WHITE);
-        spr->drawCentreString("YAYIN YAPILIYOR", 120, 220, 2);
-        spr->setTextColor(TFT_YELLOW);
-        spr->drawCentreString("UID: " + writeData, 120, 240, 2);
-        
-        spr->pushSprite(0, 0);
+        // Animasyonu yavaşlat ve NFC'ye öncelik ver (Ekran çizimi NFC zamanlamasını bozabilir)
+        static unsigned long lastDrawTime = 0;
+        if (millis() - lastDrawTime > 500) { // 500ms'de bir güncelle (NFC'ye daha çok zaman kalsın)
+            lastDrawTime = millis();
+            
+            spr->fillSprite(TFT_BLACK);
+            drawAppScreen(spr, "EMULASYON", 0x001F, "", false);
+            
+            // Mavi Radar Animasyonu
+            animRadius = (animRadius + 4) % 80;
+            spr->drawCircle(120, 150, animRadius, 0x001F);
+            spr->drawCircle(120, 150, (animRadius + 25) % 80, 0x0010);
+            spr->drawCircle(120, 150, (animRadius + 50) % 80, 0x000F);
+            
+            spr->setTextColor(TFT_WHITE);
+            spr->drawCentreString("YAYIN YAPILIYOR", 120, 220, 2);
+            spr->setTextColor(TFT_YELLOW);
+            spr->drawCentreString("UID: " + writeData, 120, 240, 2);
+            
+            spr->pushSprite(0, 0);
+        }
 
         // PN532'yi Hedef (Target) moduna al
         // NOT: Standart kütüphanede UID ayarlamak zordur, genellikle rastgele veya sabit UID yayar.
@@ -400,12 +407,28 @@ void updateNFCApp(TFT_eSprite* spr, ControlResult& res, bool& appLoaded, bool& n
         uint8_t command[] = {0, 0}; // Gelen komut için buffer
         uint8_t cmdLen = sizeof(command);
         
-        // 50ms timeout ile hedef olmaya çalış (Arayüzün donmaması için kısa tutuyoruz)
-        if (nfc.AsTarget()) {
-             playSystemSound(SOUND_CLICK); // Okuyucu ile temas kuruldu sesi
-             statusMsg = "Okuyucu Algilandi!";
-             // Okuyucu ile iletişim kuruldu, burada veri alışverişi yapılabilir
-             // Şimdilik sadece ses verip devam ediyoruz.
+        // Emülasyon şansını artırmak için arka arkaya birkaç kez dene
+        // Telefon sinyali gönderdiğinde o an dinliyor olmamız lazım.
+        bool success = false;
+        for(int i=0; i<3; i++) { 
+            if (nfc.AsTarget()) {
+                success = true;
+                break;
+            }
+            delay(10); // Kısa bekleme
+        }
+
+        if (success) {
+            // GÖRSEL GERİ BİLDİRİM (BAŞARILI)
+            spr->fillSprite(TFT_BLACK);
+            drawAppScreen(spr, "EMULASYON", 0x07E0, "OKUYUCU BAGLANDI!", false); // Yeşil Başlık
+            spr->fillCircle(120, 150, 50, 0x07E0); // Yeşil Daire
+            spr->setTextColor(TFT_BLACK);
+            spr->drawCentreString("OKUNDU", 120, 142, 2);
+            spr->pushSprite(0, 0);
+
+            playSystemSound(SOUND_ENTER); // Başarı sesi
+            delay(1000); // Kullanıcının görmesi için bekle
         }
     }
     // --- SİLME MODU (Dosya Seçimi) ---
