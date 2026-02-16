@@ -6,9 +6,9 @@
 const MenuItem menuItems[] = {
     {"MUZIK", 0x780F, icon_music}, {"FOTO", 0x07E0, icon_photo}, {"NFC", 0x051D, icon_nfc}, {"NOTLAR", 0x7BEF, NULL},
     {"AYARLAR", 0x01CF, NULL}, {"GPIO", 0xFDA0, NULL}, {"SAAT", 0x07FF, NULL}, {"WEB", 0xF81F, NULL}, {"SD KART", 0xEFE0, NULL},
-    {"OYUNLAR", 0x7800, NULL}, {"HAKKINDA", 0xFFFF, NULL}
+    {"OYUNLAR", 0x7800, NULL}, {"POMODORO", 0xF800, NULL}, {"HAKKINDA", 0xFFFF, NULL}
 };
-const int totalItems = 11; // Sayı aynı kaldı çünkü VIDEO yerine NFC koydum (veya artırabilirsin)
+const int totalItems = 12; // Sayı aynı kaldı çünkü VIDEO yerine NFC koydum (veya artırabilirsin)
 
 void drawMenu(TFT_eSprite* spr, int scrollX, int selectedIdx) {
     spr->fillSprite(TFT_BLACK);

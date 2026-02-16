@@ -57,4 +57,7 @@ extern const int totalItems;
 #define NFC_IRQ -1 // IRQ baglamadiysaniz -1 yapin (I2C'de stabilite icin onerilir)
 #define NFC_RST -1 // RST baglamadiysaniz -1 yapin
 
+// --- POMODORO AYARLARI ---
+#define POMODORO_STEP_MIN 1 // Yukari/Asagi tuslari ile artis miktari (Dakika)
+
 #endif
