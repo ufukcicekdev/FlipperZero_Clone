@@ -11,6 +11,7 @@
 #include "app_photo.h"
 #include "app_nfc.h"
 #include "app_pomodoro.h"
+#include "app_games.h"
 #include "sound.h"
 #include "settings.h"
 
@@ -174,6 +175,10 @@ void loop() {
         // POMODORO Uygulaması
         else if (menuItems[activeAppIndex].name == "POMODORO") {
             updatePomodoroApp(&spr, res, appLoaded, needsRedraw, currentState);
+        }
+        // OYUNLAR Uygulaması
+        else if (menuItems[activeAppIndex].name == "OYUNLAR") {
+            updateGamesApp(&spr, res, appLoaded, needsRedraw, currentState);
         }
         else {
             // Diğer Uygulamalar (Standart Ekran)
